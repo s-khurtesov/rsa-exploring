@@ -4,32 +4,22 @@ import rsa
 import aes
 import asn1
 
-FILE = 'test.txt'
-FILE_ENC = 'enc-' + FILE
-FILE_ENC_ASN = FILE_ENC + '.asn1'
-FILE_ENC_ASN_JSON = FILE_ENC_ASN + '.json'
-FILE_DEC = 'dec-' + FILE
-FILE_DEC_ASN = FILE_DEC + '.asn1'
-FILE_DEC_ASN_JSON = FILE_DEC_ASN + '.json'
-FILE_SIGN_ASN = 'sign-' + FILE + '.asn1'
-FILE_SIGN_ASN_JSON = 'sign-' + FILE + '.json'
-
 
 def encrypt_file(in_name: str, out_name: str, key: bytes) -> int:
-    with open(in_name, 'rb') as fo:
-        plaintext = fo.read()
+    with open(in_name, 'rb') as fin:
+        plaintext = fin.read()
     enc = aes.aes_enc(plaintext, key)
-    with open(out_name, 'wb') as fo:
-        fo.write(enc)
+    with open(out_name, 'wb') as fout:
+        fout.write(enc)
     return len(enc)
 
 
 def decrypt_file(in_name: str, out_name: str, key: bytes) -> None:
-    with open(in_name, 'rb') as fo:
-        ciphertext = fo.read()
-    dec = aes.aes_dec(ciphertext, key)
-    with open(out_name, 'wb') as fo:
-        fo.write(dec)
+    with open(in_name, 'rb') as fin:
+        cipher = fin.read()
+    dec = aes.aes_dec(cipher, key)
+    with open(out_name, 'wb') as fout:
+        fout.write(dec)
 
 
 def cs_init() -> Tuple[dict, bytes]:
@@ -145,34 +135,45 @@ def cs_sign_check(
     return r == t
 
 
-# Get keys
-rsa_key_pair, aes_key = cs_init()
+if __name__ == "__main__":
+    FILE = 'balloon.jpg'
+    FILE_ENC = 'enc-' + FILE
+    FILE_ENC_ASN = FILE_ENC + '.asn1'
+    FILE_ENC_ASN_JSON = FILE_ENC_ASN + '.json'
+    FILE_DEC = 'dec-' + FILE
+    FILE_DEC_ASN = FILE_DEC + '.asn1'
+    FILE_DEC_ASN_JSON = FILE_DEC_ASN + '.json'
+    FILE_SIGN_ASN = 'sign-' + FILE + '.asn1'
+    FILE_SIGN_ASN_JSON = 'sign-' + FILE + '.json'
 
-# --- ENCRYPTION ---
-cs_encrypt(
-    FILE, FILE_ENC, FILE_ENC_ASN,
-    rsa_key_pair['public'], aes_key
-)
+    # Get keys
+    rsa_key_pair, aes_key = cs_init()
 
-dec_rsa_public_key, dec_aes_key = cs_decrypt(
-    FILE_ENC, FILE_DEC,
-    FILE_ENC_ASN, FILE_DEC_ASN_JSON,
-    rsa_key_pair['private']
-)
+    # --- ENCRYPTION ---
+    cs_encrypt(
+        FILE, FILE_ENC, FILE_ENC_ASN,
+        rsa_key_pair['public'], aes_key
+    )
 
-assert cs_encryption_check(
-    FILE, FILE_DEC,
-    dec_rsa_public_key, dec_aes_key,
-    rsa_key_pair['public'], aes_key
-)
+    dec_rsa_public_key, dec_aes_key = cs_decrypt(
+        FILE_ENC, FILE_DEC,
+        FILE_ENC_ASN, FILE_DEC_ASN_JSON,
+        rsa_key_pair['private']
+    )
 
-# --- SIGN ---
-sign = cs_sign_create(
-    FILE, FILE_SIGN_ASN,
-    rsa_key_pair['private'], rsa_key_pair['public']
-)
+    assert cs_encryption_check(
+        FILE, FILE_DEC,
+        dec_rsa_public_key, dec_aes_key,
+        rsa_key_pair['public'], aes_key
+    )
 
-assert cs_sign_check(
-    FILE, FILE_SIGN_ASN, FILE_SIGN_ASN_JSON,
-    rsa_key_pair['public'], sign
-)
+    # --- SIGN ---
+    sign = cs_sign_create(
+        FILE, FILE_SIGN_ASN,
+        rsa_key_pair['private'], rsa_key_pair['public']
+    )
+
+    assert cs_sign_check(
+        FILE, FILE_SIGN_ASN, FILE_SIGN_ASN_JSON,
+        rsa_key_pair['public'], sign
+    )
