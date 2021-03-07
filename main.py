@@ -5,7 +5,7 @@ import aes
 import asn1
 
 
-def encrypt_file(in_name: str, out_name: str, key: bytes) -> int:
+def aes_encrypt_file(in_name: str, out_name: str, key: bytes) -> int:
     with open(in_name, 'rb') as fin:
         plaintext = fin.read()
     enc = aes.aes_enc(plaintext, key)
@@ -14,9 +14,9 @@ def encrypt_file(in_name: str, out_name: str, key: bytes) -> int:
     return len(enc)
 
 
-def decrypt_file(in_name: str, out_name: str, key: bytes) -> None:
+def aes_decrypt_file(in_name: str, out_name: str, key: bytes, offset: int = 0) -> None:
     with open(in_name, 'rb') as fin:
-        cipher = fin.read()
+        cipher = fin.read()[offset:]
     dec = aes.aes_dec(cipher, key)
     with open(out_name, 'wb') as fout:
         fout.write(dec)
@@ -34,11 +34,11 @@ def cs_init() -> Tuple[dict, bytes]:
 
 
 def cs_encrypt(
-        in_name: str, out_name: str, asn1_name: str,
+        in_name: str, out_name: str, enc_name: str, asn1_name: str,
         rsa_public_key: dict, aes_sym_key: bytes
 ) -> None:
     # Encrypt test file
-    enc_file_len: int = encrypt_file(in_name, out_name, aes_sym_key)
+    enc_file_len: int = aes_encrypt_file(in_name, enc_name, aes_sym_key)
 
     # Encrypt symmetric key
     enc_aes_key: bytes = rsa.rsa_enc(aes_sym_key, rsa_public_key)
@@ -50,14 +50,19 @@ def cs_encrypt(
         asn1.AES_ID, enc_file_len
     )
 
+    with open(asn1_name, 'rb') as f_asn1, \
+            open(enc_name, 'rb') as f_enc, \
+            open(out_name, 'wb') as f_out:
+        f_out.write(f_asn1.read() + f_enc.read())
+
 
 def cs_decrypt(
         in_name: str, out_name: str,
-        asn1_name: str, asn1_json_name: str,
+        asn1_json_name: str,
         rsa_private_key: dict
 ) -> Tuple[dict, bytes]:
     # Decode ASN1 cipher file
-    _ = asn1.asn1_to_json(asn1_name, asn1_json_name)
+    _, offset = asn1.asn1_to_json(in_name, asn1_json_name)
 
     cipher_asn: dict = asn1.parse_cipher_file(asn1_json_name)
 
@@ -66,10 +71,12 @@ def cs_decrypt(
     rsa_public_key: dict = cipher_asn['asym_public_key']
     enc_aes_sym_key: bytes = asn1.int_to_bytes(cipher_asn['asym_cipher'])
 
+    assert (rsa_public_key['n'] == rsa_private_key['n'])
+
     # Decrypt file with key from ASN1
     aes_sym_key: bytes = rsa.rsa_dec(enc_aes_sym_key, rsa_private_key)
 
-    decrypt_file(in_name, out_name, aes_sym_key)
+    aes_decrypt_file(in_name, out_name, aes_sym_key, offset)
 
     return rsa_public_key, aes_sym_key
 
@@ -136,29 +143,29 @@ def cs_sign_check(
 
 
 if __name__ == "__main__":
-    FILE = 'pep20.txt'
+    FILE = 'balloon.jpg'
     FILE_ENC = 'enc-' + FILE + '.bin'
+    FILE_ENC_DATA = 'enc-data-' + FILE + '.bin'
     FILE_ENC_ASN = FILE_ENC + '.asn1'
     FILE_ENC_ASN_JSON = FILE_ENC_ASN + '.json'
-    FILE_ENC_RES = 'res-' + FILE_ENC
     FILE_DEC = 'dec-' + FILE
     FILE_DEC_ASN = FILE_DEC + '.asn1'
     FILE_DEC_ASN_JSON = FILE_DEC_ASN + '.json'
     FILE_SIGN_ASN = 'sign-' + FILE + '.asn1'
-    FILE_SIGN_ASN_JSON = 'sign-' + FILE + '.json'
+    FILE_SIGN_ASN_JSON = FILE_SIGN_ASN + '.json'
 
     # Get keys
     rsa_key_pair, aes_key = cs_init()
 
     # --- ENCRYPTION ---
     cs_encrypt(
-        FILE, FILE_ENC, FILE_ENC_ASN,
+        FILE, FILE_ENC, FILE_ENC_DATA, FILE_ENC_ASN,
         rsa_key_pair['public'], aes_key
     )
 
     dec_rsa_public_key, dec_aes_key = cs_decrypt(
         FILE_ENC, FILE_DEC,
-        FILE_ENC_ASN, FILE_DEC_ASN_JSON,
+        FILE_DEC_ASN_JSON,
         rsa_key_pair['private']
     )
 
@@ -167,11 +174,6 @@ if __name__ == "__main__":
         dec_rsa_public_key, dec_aes_key,
         rsa_key_pair['public'], aes_key
     )
-
-    with open(FILE_ENC_ASN, 'rb') as f_asn1, \
-            open(FILE_ENC, 'rb') as f_enc, \
-            open(FILE_ENC_RES, 'wb') as f_out:
-        f_out.write(f_asn1.read() + f_enc.read())
 
     # --- SIGN ---
     sign = cs_sign_create(
@@ -183,3 +185,14 @@ if __name__ == "__main__":
         FILE, FILE_SIGN_ASN, FILE_SIGN_ASN_JSON,
         rsa_key_pair['public'], sign
     )
+
+    # --- KEYS ---
+    def int_to_hex(num: int, length: int = 256, join_str: str = '') -> str:
+        return join_str.join('{:02x}'.format(x) for x in num.to_bytes(length, 'big'))
+
+    print('n =', int_to_hex(rsa_key_pair['public']['n']))
+    print('e =', int_to_hex(rsa_key_pair['public']['e']))
+    assert (rsa_key_pair['private']['n'] == rsa_key_pair['public']['n'])
+    print('d =', int_to_hex(rsa_key_pair['private']['d']))
+    print('p =', int_to_hex(rsa_key_pair['secret']['p'], 128))
+    print('q =', int_to_hex(rsa_key_pair['secret']['q'], 128))
