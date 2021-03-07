@@ -136,10 +136,11 @@ def cs_sign_check(
 
 
 if __name__ == "__main__":
-    FILE = 'balloon.jpg'
-    FILE_ENC = 'enc-' + FILE
+    FILE = 'pep20.txt'
+    FILE_ENC = 'enc-' + FILE + '.bin'
     FILE_ENC_ASN = FILE_ENC + '.asn1'
     FILE_ENC_ASN_JSON = FILE_ENC_ASN + '.json'
+    FILE_ENC_RES = 'res-' + FILE_ENC
     FILE_DEC = 'dec-' + FILE
     FILE_DEC_ASN = FILE_DEC + '.asn1'
     FILE_DEC_ASN_JSON = FILE_DEC_ASN + '.json'
@@ -166,6 +167,11 @@ if __name__ == "__main__":
         dec_rsa_public_key, dec_aes_key,
         rsa_key_pair['public'], aes_key
     )
+
+    with open(FILE_ENC_ASN, 'rb') as f_asn1, \
+            open(FILE_ENC, 'rb') as f_enc, \
+            open(FILE_ENC_RES, 'wb') as f_out:
+        f_out.write(f_asn1.read() + f_enc.read())
 
     # --- SIGN ---
     sign = cs_sign_create(
