@@ -18,6 +18,13 @@ PREDEFINED_PQE = {
 }
 
 
+def phi(p_: int, q_: int) -> int:
+    def lcm(a: int, b: int) -> int:
+        return abs(a * b) // GCD(a, b)
+
+    return lcm(p_ - 1, q_ - 1)
+
+
 def generate_key_pair(def_p: int = None, def_q: int = None, def_e: int = None, pq_bits: int = 1024,
                       e_bits: int = None) -> dict:
     def find_e(phi_n_: int) -> int:
@@ -28,12 +35,6 @@ def generate_key_pair(def_p: int = None, def_q: int = None, def_e: int = None, p
         while GCD(e_, phi_n_) != 1:
             e_ = int.from_bytes(get_random_bytes(e_bits//8), 'big')
         return e_
-
-    def phi(p_: int, q_: int) -> int:
-        def lcm(a: int, b: int) -> int:
-            return abs(a * b) // GCD(a, b)
-
-        return lcm(p_ - 1, q_ - 1)
 
     p = getPrime(pq_bits) if def_p is None else def_p
     q = getPrime(pq_bits) if def_q is None else def_q
@@ -123,26 +124,29 @@ def rsa_check(m: bytes, public_key: dict, s: bytes) -> Tuple[bytes, bytes]:
     return r, t
 
 
-def rsa_test(test_key_pair: dict) -> None:
-    print('key pair:', test_key_pair)
+def rsa_test(test_key_pair: dict, show: bool = True) -> None:
+    if show:
+        print('key pair:', test_key_pair)
 
     test = bytes('testRsaCipher1234567890', 'utf-8')
 
     enc_test = rsa_enc(test, test_key_pair['public'])
     dec_test = rsa_dec(enc_test, test_key_pair['private']).rstrip(bytes(1))
 
-    print('m      :', test.hex())
-    print('E(m)   :', enc_test.hex())
-    print('D(E(m)):', dec_test.hex())
+    if show:
+        print('m      :', test.hex())
+        print('E(m)   :', enc_test.hex())
+        print('D(E(m)):', dec_test.hex())
 
     assert (test == dec_test)
 
     sign = rsa_sign(test, test_key_pair['private'])
     r, t = rsa_check(test, test_key_pair['public'], sign)
 
-    print('sign:', sign)
-    print('r   :', r)
-    print('t   :', t)
+    if show:
+        print('sign:', sign)
+        print('r   :', r)
+        print('t   :', t)
 
     assert (r == t)
 
